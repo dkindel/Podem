@@ -78,6 +78,7 @@ func makecircuit(cktname string) {
 	ckt.fanout = make([]int, count)
 	ckt.inputs = make([]int, count)
 	ckt.outputs = make([]int, count)
+	ckt.stacks = make([]Stack, count)
 
 	ckt.inlist = make([][]int, count)
 	ckt.outlist = make([][]int, count)
@@ -92,10 +93,6 @@ func makecircuit(cktname string) {
 	scanner := bufio.NewScanner(file)
 
 	for i := 1; i < count; i++ {
-		//always start with every gate as X
-		ckt.value1[netnum] = 2
-		ckt.value2[netnum] = 2
-
 		//get the line text
 		scanner.Scan()
 		txt := scanner.Text()
@@ -119,6 +116,10 @@ func makecircuit(cktname string) {
 		ckt.levelNum[netnum] = split[2]
 		ckt.fanin[netnum] = split[3]
 		split_pos += 4
+
+		//always start with every gate as X
+		ckt.value1[netnum] = 2
+		ckt.value2[netnum] = 2
 
 		if ckt.levelNum[netnum] > ckt.numlevels-1 {
 			ckt.numlevels = ckt.levelNum[netnum] + 1 //the number of levels is that num+1
@@ -228,58 +229,6 @@ func loadFaults(cktname string) {
 		txt := scanner.Text()
 		f := translateFaultLine(txt)
 		ckt.faults = append(ckt.faults, f)
-	}
-}
-
-//gets a list of the inputs that will sensitize the fault
-func sensitizedFaultList(fault Fault) [][]int {
-	pow := intpow(2, ckt.fanin[fault.gatenum])
-	inputlist := make([][]int, 0, pow)
-	//make a slice in the loop below and appened whenever needed
-
-	for i := 0; i < intpow(2, ckt.fanin[fault.gatenum]); i++ {
-		attempt := make([]int, ckt.fanin[fault.gatenum])
-		for j := 0; j < ckt.fanin[fault.gatenum]; j++ {
-			pow := intpow(2, j)
-			pow = pow & i
-			var bit int
-			if pow != 0 {
-				bit = 1
-			} else {
-				bit = 0
-			}
-			attempt[ckt.fanin[fault.gatenum]-1-j] = bit
-		}
-		realval := simGate(ckt.gatetype1[fault.gatenum], attempt)
-		faultval := simGate(ckt.gatetype2[fault.gatenum], attempt)
-		if realval != faultval {
-			inputlist = append(inputlist, attempt)
-		}
-	}
-	return inputlist
-}
-
-//loops through all the faults and runs podem
-func runPodemAllFaults() {
-	for _, fault := range ckt.faults {
-		ckt.gatetype2[fault.gatenum] = fault.gatetype
-		//fault now injected.  Now we need to run
-		runPodem(fault)
-	}
-}
-
-//runs podem for a single fault
-func runPodem(f Fault) {
-	inputlist := sensitizedFaultList(f)
-	fmt.Println(inputlist)
-}
-
-//just a helper function to print off the possible input values
-//that'll sensitize the list
-func runSensList() {
-	for _, f := range ckt.faults {
-		inputlist := sensitizedFaultList(f)
-		fmt.Println(inputlist)
 	}
 }
 

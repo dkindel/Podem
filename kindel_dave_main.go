@@ -28,4 +28,5 @@ func main() {
 	logicSimFromFile(name)*/
 	loadFaults(name) //load the faults from the file
 	runPodemAllFaults()
+	makeInputList(8, 1)
 }
