@@ -43,6 +43,8 @@ func sensitizedFaultList(fault Fault) [][]int {
 //loops through all the faults and runs podem
 func runPodemAllFaults() {
 	for _, fault := range ckt.faults {
+		fmt.Println("----------------------------------------------------------")
+		fmt.Println("Running PODEM on fault of faulty gate", fault.gatenum, "with gate type", fault.gatetype)
 		ckt.gatetype2[fault.gatenum] = fault.gatetype
 		//fault now injected.  Now we need to run
 		if runPodem(fault) {
@@ -51,7 +53,7 @@ func runPodemAllFaults() {
 				fmt.Println(ckt.inputs[i], " = ", ckt.value1[ckt.inputs[i]])
 			}
 		} else {
-			fmt.Println("All possible inputs have failed.  No test is possible.")
+			fmt.Println("All possible inputs have failed.  No test is possible for faulty gate", fault.gatenum, "with gate type", fault.gatetype)
 		}
 	}
 }

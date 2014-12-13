@@ -65,12 +65,14 @@ If you `cd` to the podem directory, there are 2 ways to build the code. One is t
 
 To run the code, run `go run *.go [filename] [-debug]`. This will build and automatically run the code.  The parameters are explained in the next section.
 
+3 example tests have been provided, c1, c2, and c3. c1 is the same as c17 in past projects in this class.  c2 is the same as c17 but with an extra input on gate 8.  c3 is a completely different circuit with a lot of types of gates and many gates in different levels.  
+
 ####Parameters
 
 #####filename
-The filename paramter is the **base** name of the files to run.  That is, if you're running test c17, this requires the files c17.lev and c17.flt to be in the same directories as the source `*.go` files.  Thus, the command line to run against c17 is:
+The filename paramter is the **base** name of the files to run.  That is, if you're running test c1, this requires the files c1.lev and c1.flt to be in the same directories as the source `*.go` files.  Thus, the command line to run against c1 is:
 ```
-go run *.go c17
+go run *.go c1
 ```
 
 The .lev and .flt file descriptions are described later.
@@ -115,6 +117,8 @@ If the debug flag is set, a lot of information will be output and most will be p
 
 For example, an example successful output would be 
 ```
+-------------------------------------------------------
+Running PODEM on fault of faulty gate 8 with gate type 8
 SUCCESS! D has been propogated
 The vector that sensitizes faulty gate 8 with gate type 8 is:
 1  =  2
