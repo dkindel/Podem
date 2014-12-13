@@ -179,7 +179,14 @@ func runPodemAllFaults() {
 	for _, fault := range ckt.faults {
 		ckt.gatetype2[fault.gatenum] = fault.gatetype
 		//fault now injected.  Now we need to run
-		runPodem(fault)
+		if runPodem(fault) {
+			fmt.Println("The vector that sensitizes the fault is:")
+			for i := 0; i < ckt.numin; i++ {
+				fmt.Println(ckt.inputs[i], " = ", ckt.value1[ckt.inputs[i]])
+			}
+		} else {
+			fmt.Println("All possible inputs have failed.  No test is possible.")
+		}
 	}
 }
 
@@ -188,10 +195,7 @@ func runPodem(f Fault) bool {
 	//find what inputs will sensitize the fault
 	inputlist := sensitizedFaultList(f)
 
-	varDseen := false
-	varDBseen := false
-
-	fmt.Println(inputlist)
+	debugMsg("Possible gate inputs to sensitize the fault:", inputlist)
 
 	//This is essentially running through the implication stack
 	//The test can still be tested using a different input.
@@ -199,30 +203,19 @@ podemStart: //Label here so we can continue if failed
 	for _, input := range inputlist {
 		//select the first group of inputs that sensitize the fault
 		setAllToX()
-		if simGate(ckt.gatetype1[f.gatenum], input) == 1 {
-			if varDseen { //no need to run podem for the same variable
-				continue
-			}
-			varDseen = true
-		} else {
-			if varDBseen {
-				continue
-			}
-			varDBseen = true
-		}
 
 		var stack Stack
-		fmt.Println("running xpath with ", f.gatenum)
+		debugMsg("Running xpath with", f.gatenum)
 		for {
 			for xpathCheck(f.gatenum) {
-				fmt.Println("running getObjective with inputs ", input, " for ", f.gatenum)
+				debugMsg("Running getObjective with inputs", input, "for", f.gatenum)
 				objective := getObjective(f.gatenum, input)
-				fmt.Println("getObjective returned with ", objective)
+				debugMsg("Running a backtrace from", objective.gatenum, "with", objective.val)
 				if objective.gatenum == -1 {
-					panic("uh oh")
+					panic("Uh oh.  This shouldn't have happened because the xpath should check if there's an x gate on the D frontier that we can use!")
 				}
 				pi := backtrace(objective)
-				fmt.Println("backtrace from ", objective, " provided ", pi)
+				debugMsg("Backtrace from", objective, "provided", pi)
 				stack.Push(pi)
 				ckt.value1[pi.inputnum] = pi.val
 				if implyAndTest() {
@@ -232,7 +225,7 @@ podemStart: //Label here so we can continue if failed
 			for {
 				//if we've run out of backtracking options
 				if stack.Len() == 0 {
-					fmt.Println("input ", input, " has failed.  Moving to next input.")
+					debugMsg("Input", input, "has failed.  Moving to next input if there is any untested.")
 					continue podemStart
 				}
 				//otherwise, we can backtrack!
@@ -246,7 +239,7 @@ podemStart: //Label here so we can continue if failed
 					}
 					stack.Push(lastPI)
 					ckt.value1[lastPI.inputnum] = lastPI.val
-					fmt.Println("Backtracking. Now using pi ", lastPI.inputnum, " with value ", lastPI.val)
+					debugMsg("Backtracking. Now using pi", lastPI.inputnum, "with value", lastPI.val)
 					if implyAndTest() {
 						return true
 					}
@@ -259,14 +252,13 @@ podemStart: //Label here so we can continue if failed
 		for i := 1; i <= ckt.numgates; i++ {
 			fmt.Println("gate ", i, " has logic val ", ckt.value1[i])
 		}*/
-	fmt.Println("All possible inputs have failed.  No test is possible.")
 	return false
 }
 
 func implyAndTest() bool {
 	imply()
 	for i := 1; i <= ckt.numgates; i++ {
-		fmt.Println("gate ", i, " has logic val ", ckt.value1[i])
+		debugMsg("gate ", i, " has logic val ", ckt.value1[i])
 	}
 	for _, po := range ckt.outputs {
 		if ckt.value1[po] == 3 || ckt.value1[po] == 4 {
@@ -308,7 +300,7 @@ func getObjective(gatenum int, faultGateInputs []int) Objective {
 		}
 	}
 	dgate, val := xGateFromDFrontier(gatenum, ckt.value1[gatenum])
-	fmt.Println("xGateFromDFrontier returned ", dgate, val)
+	debugMsg("xGateFromDFrontier returned ", dgate, val)
 	if dgate == -1 {
 		objective.gatenum = -1
 		objective.val = -1
@@ -539,7 +531,7 @@ func backtrace(objective Objective) PI {
 				}
 			}
 		}
-		fmt.Println("backtracing ", currGate, " with currVal ", currVal)
+		debugMsg("backtracing ", currGate, " with currVal ", currVal)
 	}
 	pi.inputnum = currGate
 	pi.val = currVal

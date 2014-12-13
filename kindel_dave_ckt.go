@@ -63,7 +63,7 @@ func makecircuit(cktname string) {
 
 	//ckt is defined in the main go file
 	// ckt := new(Circuit)
-	var count, junk, netnum, numpri, numout int
+	var count, junk, netnum int
 	fmt.Fscanf(file, "%d", &count)
 	fmt.Fscanf(file, "%d", &junk)
 	ckt.numgates = count - 1
@@ -130,8 +130,8 @@ func makecircuit(cktname string) {
 
 		//build input slice
 		if ckt.gatetype1[netnum] == T_input {
-			ckt.inputs[numpri] = netnum
-			numpri++
+			ckt.inputs[ckt.numin] = netnum
+			ckt.numin++
 		}
 
 		//build fanin list slice
@@ -152,8 +152,8 @@ func makecircuit(cktname string) {
 		split_pos++
 
 		if ckt.gatetype1[netnum] == T_output {
-			ckt.outputs[numout] = netnum
-			numout++
+			ckt.outputs[ckt.numout] = netnum
+			ckt.numout++
 		}
 
 		//build fanout list slice
