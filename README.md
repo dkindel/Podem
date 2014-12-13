@@ -91,22 +91,22 @@ For instance, if the .flt resembles
 ```
 This means that there is 1 fault to be injected and the fault is that gate 8 has been switched with an OR gate.  Gate numbers can be easily found in kindel\_dave\_ckt.go (or as follows):
 
-    ```go
-    const (
-            JUNK = iota
-            T_input
-            T_output
-            T_xor
-            T_xnor
-            T_dff
-            T_and
-            T_nand
-            T_or
-            T_nor
-            T_not
-            T_buf
-          )
-    ```
+```go
+const (
+        JUNK = iota
+        T_input
+        T_output
+        T_xor
+        T_xnor
+        T_dff
+        T_and
+        T_nand
+        T_or
+        T_nor
+        T_not
+        T_buf
+      )
+```
 
 The numbering starts as JUNK = 0, T\_input = 1, and so on.  
 
@@ -114,11 +114,12 @@ The numbering starts as JUNK = 0, T\_input = 1, and so on.
 If the debug flag is set, a lot of information will be output and most will be pretty clear.  But regardless, the last couple lines will either declare a success or a failure of the PODEM algorithm.  If there's a failure, a failure message will display.  If there's a success, a success message will display along with the input the vectors that will cause the fault to be propogated.
 
 For example, an example successful output would be 
->SUCCESS! D has been propogated
->The vector that sensitizes faulty gate 8 with gate type 8 is:
->1  =  2
->2  =  0
->3  =  1
->4  =  1
->5  =  2
-
+```
+SUCCESS! D has been propogated
+The vector that sensitizes faulty gate 8 with gate type 8 is:
+1  =  2
+2  =  0
+3  =  1
+4  =  1
+5  =  2
+```
