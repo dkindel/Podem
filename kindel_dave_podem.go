@@ -46,7 +46,7 @@ func runPodemAllFaults() {
 		ckt.gatetype2[fault.gatenum] = fault.gatetype
 		//fault now injected.  Now we need to run
 		if runPodem(fault) {
-			fmt.Println("The vector that sensitizes the fault is:")
+			fmt.Println("The vector that sensitizes faulty gate", fault.gatenum, "with gate type", fault.gatetype, "is:")
 			for i := 0; i < ckt.numin; i++ {
 				fmt.Println(ckt.inputs[i], " = ", ckt.value1[ckt.inputs[i]])
 			}
