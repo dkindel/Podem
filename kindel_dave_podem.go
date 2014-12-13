@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"sort"
 )
 
 type Objective struct {
@@ -12,35 +11,6 @@ type PI struct {
 	inputnum, val int
 	alternateUsed bool
 }
-
-type ByInputX [][]int
-
-//sort functions to sort by x
-//This helps keeps x's in the circuit as long as possible
-func (a ByInputX) Len() int {
-	return len(a)
-}
-
-func (a ByInputX) Swap(i, j int) {
-	a[i], a[j] = a[j], a[i]
-}
-
-func (a ByInputX) Less(i, j int) bool {
-	numXinI, numXinJ := 0, 0
-	for _, val := range a[i] {
-		if val == 2 {
-			numXinI++
-		}
-	}
-	for _, val := range a[j] {
-		if val == 2 {
-			numXinJ++
-		}
-	}
-	return numXinI < numXinJ
-}
-
-//end sort functions
 
 //gets a list of the inputs that will sensitize the fault
 func sensitizedFaultList(fault Fault) [][]int {
@@ -68,110 +38,6 @@ func sensitizedFaultList(fault Fault) [][]int {
 		}
 	}
 	return inputlist
-}
-
-//similar to finding the list that sensitizes the fault but
-//this function finds all inputs (by only changing x vals)
-//that make the outval happen
-func makeInputList(gateNum, outVal int) [][]int {
-	//just to start, check to see if the output is a DC
-	//if it is, we know that the input list is all X's as well
-	if outVal == 2 {
-		inputlist := make([][]int, 1)
-		inputlist[0] = make([]int, ckt.fanin[gateNum])
-		for i := 0; i < ckt.fanin[gateNum]; i++ {
-			inputlist[0][i] = 2
-		}
-		return inputlist
-	}
-
-	numVals := 3 //this lets us know how many variables this function genereates for
-	//2 is only 0 and 1, 3 is 0, 1, and X, 5 is all values including D's
-	pow := intpow(numVals, ckt.fanin[gateNum])
-	inputlist := make([][]int, 0, pow)
-	allcombinations := make([][]int, 0, pow)
-
-	//ckt.value1[7] = 3
-
-	for i := 0; i < pow; i++ {
-		attempt := make([]int, ckt.fanin[gateNum])
-		index := 0
-		for j := ckt.fanin[gateNum] - 1; j >= 0; j-- {
-			currFaninGate := ckt.cc0inlist[gateNum][j]
-			if ckt.value1[currFaninGate] == 2 { //only change if it's x
-				div := intpow(numVals, index)
-				attempt[j] = (i / div) % numVals
-			} else {
-				attempt[j] = ckt.value1[currFaninGate]
-			}
-			index++
-		}
-		allcombinations = append(allcombinations, attempt)
-	}
-
-	removeDuplicateAttempts(&allcombinations)
-	//after removing the duplicates, we now have all the possible combinations
-	//of inputs.  We now need to choose only the inputs which will provide us
-	//with an out put of outVal.
-	//Remember that in building the combination list, only values with x have
-	//been changed here since anything else has been changed in other places
-	//fmt.Println(allcombinations)
-	for _, slice := range allcombinations {
-		val := simGate(ckt.gatetype1[gateNum], slice)
-		if val == outVal {
-			inputlist = append(inputlist, slice)
-		}
-	}
-
-	/*fmt.Println(inputlist)
-	stack := makeStack(inputlist)
-	for stack.Len() > 0 {
-		slice := stack.Pop()
-		fmt.Println(slice)
-	}*/
-	sort.Sort(ByInputX(inputlist))
-	return inputlist
-}
-
-func makeStack(slice [][]int) *Stack {
-	stack := new(Stack)
-	for _, subslice := range slice {
-		stack.Push(subslice)
-	}
-	return stack
-}
-
-//removes all duplicates in the slice
-//this is essential because many wasted attempts can
-//be performed on inputs that have already been tried
-func removeDuplicateAttempts(slice *[][]int) {
-	length := len(*slice) - 1
-	for i := 0; i < length; i++ {
-		for j := i + 1; j <= length; j++ {
-			realslice := *slice
-			if slicesAreEqual(realslice[i], realslice[j]) {
-				realslice[j] = realslice[length]
-				realslice = realslice[0:length]
-				*slice = realslice
-				length--
-				j--
-			}
-		}
-	}
-}
-
-//Tests of 2 slices are equal
-//just a helper function that's used
-func slicesAreEqual(slice1, slice2 []int) bool {
-	if len(slice1) != len(slice2) {
-		return false
-	}
-	for i, item := range slice1 {
-		if item != slice2[i] {
-			return false
-		}
-	}
-	return true
 }
 
 //loops through all the faults and runs podem
@@ -273,7 +139,6 @@ func implyAndTest() bool {
 func setAllToX() {
 	for i := 1; i <= ckt.numgates; i++ {
 		ckt.value1[i] = 2
-		ckt.value2[i] = 2
 	}
 }
 
@@ -286,6 +151,10 @@ func runSensList() {
 	}
 }
 
+//gets the current objective.  If the faulty gate hasn't been set
+//yet, it returns an X value on the faulty gate inputs
+//otherwise, it searches for the D frontier and finds an X value
+//on those inputs.
 func getObjective(gatenum int, faultGateInputs []int) Objective {
 	var objective Objective
 	for i, inputval := range faultGateInputs {
@@ -306,102 +175,12 @@ func getObjective(gatenum int, faultGateInputs []int) Objective {
 		objective.val = -1
 		return objective
 	}
-	/*if dgate == gatenum {
-		objective.gatenum = gatenum
-		if val == 1 {
-			objective.val = 0
-		}
-		if val == 0 {
-			objective.val = 1
-		}
-		return objective
-	}
-	c := 0
-	controlgate, controlval := controllingInput(dgate)
-	if controlgate != -1 {
-		if controlval != 2 {
-			c = controlval
-		}
-		dgate = controlgate
-	}
-	objective.gatenum = dgate
-	if c == 0 {
-		objective.val = 1
-	} else {
-		objective.val = 0
-	}*/
 	objective.gatenum = dgate
 	objective.val = val
 	return objective
 }
 
-func controllingInput(dgate int) (int, int) {
-	val := simGate(ckt.gatetype2[dgate], ckt.cc0inlist[dgate])
-	switch ckt.gatetype2[dgate] {
-	case T_or:
-		fallthrough
-	case T_nand:
-		if val == 0 {
-			return ckt.cc0inlist[dgate][0], 0
-		} else if val == 1 {
-			numOnes := 0
-			var gate int
-			for _, input := range ckt.cc0inlist[dgate] {
-				if ckt.value1[input] == 1 {
-					numOnes++
-					gate = input
-				}
-			}
-			if numOnes == 1 {
-				return gate, 1
-			}
-		} else if val == 2 {
-			numX := 0
-			var gate int
-			for _, input := range ckt.cc0inlist[dgate] {
-				if ckt.value1[input] == 2 {
-					numX++
-					gate = input
-				}
-			}
-			if numX == 1 {
-				return gate, 2
-			}
-		}
-	case T_nor:
-		fallthrough
-	case T_and:
-		if val == 1 {
-			return ckt.cc0inlist[dgate][0], 1
-		} else if val == 0 {
-			numZeroes := 0
-			var gate int
-			for _, input := range ckt.cc0inlist[dgate] {
-				if ckt.value1[input] == 0 {
-					numZeroes++
-					gate = input
-				}
-			}
-			if numZeroes == 1 {
-				return gate, 0
-			}
-		} else if val == 2 {
-			numX := 0
-			var gate int
-			for _, input := range ckt.cc0inlist[dgate] {
-				if ckt.value1[input] == 2 {
-					numX++
-					gate = input
-				}
-			}
-			if numX == 1 {
-				return gate, 2
-			}
-		}
-	}
-	return -1, -1 //no controlling gate found
-}
-
+//Finds a gate that is x on the D Frontier
 func xGateFromDFrontier(gatenum, val int) (int, int) {
 	for _, output := range ckt.outlist[gatenum] {
 		if (ckt.value1[output] == 3) || (ckt.value1[output] == 4) {
@@ -428,12 +207,15 @@ func xGateFromDFrontier(gatenum, val int) (int, int) {
 	return -1, -1
 }
 
+//runs the xpath check on the outputs and on the d frontier.
+//we have to make sure that the test CAN be run
 func xpathCheck(faultyGate int) bool {
 	for _, po := range ckt.outputs {
 		if xpathRecur(faultyGate, po) {
 			return true
 		}
 	}
+	//if the faulty gate isn't X, check the D frontier for an X gate
 	if ckt.value1[faultyGate] != 2 {
 		response, _ := xGateFromDFrontier(faultyGate, ckt.value1[faultyGate])
 		if response == -1 {
@@ -443,6 +225,7 @@ func xpathCheck(faultyGate int) bool {
 	return true
 }
 
+//Recursive function for checking the xpath
 func xpathRecur(faultyGate, gate int) bool {
 	for _, input := range ckt.cc0inlist[gate] {
 		//we're looking at the faulty gate.
@@ -464,6 +247,11 @@ func xpathRecur(faultyGate, gate int) bool {
 	return false
 }
 
+//The backtrace function!
+//This runs from the objective down to a PI, finding the values for
+//each gate along the way.  If it encounters a not/nand/nor, it
+//flips the value to set at the PI (starting with the desired
+//value of the objective)
 func backtrace(objective Objective) PI {
 	var pi PI
 	currGate := objective.gatenum
@@ -473,6 +261,7 @@ func backtrace(objective Objective) PI {
 			//follow path of hardest controllability
 			numInputs := ckt.fanin[currGate]
 			if currVal == 1 {
+				//check for the cc1 controllability
 				for i := numInputs - 1; i >= 0; i-- {
 					input := ckt.cc1inlist[currGate][i]
 					if ckt.value1[input] == 2 {
@@ -485,7 +274,7 @@ func backtrace(objective Objective) PI {
 						break
 					}
 				}
-			} else {
+			} else { //check cc0 controllability
 				for i := numInputs - 1; i >= 0; i-- {
 					input := ckt.cc0inlist[currGate][i]
 					if ckt.value1[input] == 2 {
@@ -503,7 +292,7 @@ func backtrace(objective Objective) PI {
 		} else {
 			//follow easiest controllability
 			numInputs := ckt.fanin[currGate]
-			if currVal == 1 {
+			if currVal == 1 { //check cc1 controllability
 				for i := 0; i < numInputs; i++ {
 					input := ckt.cc1inlist[currGate][i]
 					if ckt.value1[input] == 2 {
@@ -516,7 +305,7 @@ func backtrace(objective Objective) PI {
 						break
 					}
 				}
-			} else {
+			} else { //check cc0 controllability
 				for i := 0; i < numInputs; i++ {
 					input := ckt.cc0inlist[currGate][i]
 					if ckt.value1[input] == 2 {
@@ -539,6 +328,9 @@ func backtrace(objective Objective) PI {
 	return pi
 }
 
+//Checks if a gate needs all of its inputs to be set to determine
+//if we should follow easiest or hardest controllability
+//this is determined by the desired value and the gate type
 func allInputsNeedSet(gateval, gatetype int) bool {
 	if gateval == 0 {
 		switch gatetype {

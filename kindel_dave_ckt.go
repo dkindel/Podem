@@ -53,7 +53,9 @@ type Fault struct {
 	gatetype int
 }
 
-//builos the circuit and loads it into the global ckt var
+//builds the circuit and loads it into the global ckt var
+//This is very similar (and pretty much taken from) the provided
+//project source code in C
 func makecircuit(cktname string) {
 	file, err := os.Open(cktname + ".lev")
 	if err != nil {
@@ -269,6 +271,7 @@ func printValByLevel() {
 	fmt.Println("")
 }
 
+//helper function to calculate the integer power
 func intpow(a, b int) int {
 	p := 1
 	for b > 0 {
