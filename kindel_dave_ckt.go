@@ -34,7 +34,8 @@ type Circuit struct {
 	numfaults   int
 	value1      []int //0 is 0, 1 is 1, 2 is X, 3 is D, 4 is !D
 	value2      []int //value 2 is the faulty value
-	inlist      [][]int
+	cc0inlist   [][]int
+	cc1inlist   [][]int
 	outlist     [][]int
 	gateByLevel [][]int
 	gatetype1   []int
@@ -45,7 +46,6 @@ type Circuit struct {
 	inputs      []int
 	outputs     []int
 	faults      []Fault
-	stacks      []Stack //each stack consists of possible inputs left
 }
 
 type Fault struct {
@@ -78,9 +78,9 @@ func makecircuit(cktname string) {
 	ckt.fanout = make([]int, count)
 	ckt.inputs = make([]int, count)
 	ckt.outputs = make([]int, count)
-	ckt.stacks = make([]Stack, count)
 
-	ckt.inlist = make([][]int, count)
+	ckt.cc0inlist = make([][]int, count)
+	ckt.cc1inlist = make([][]int, count)
 	ckt.outlist = make([][]int, count)
 
 	//initialize the gateByLevel (want to be able to append)
@@ -135,13 +135,17 @@ func makecircuit(cktname string) {
 		}
 
 		//build fanin list slice
-		ckt.inlist[netnum] = make([]int, ckt.fanin[netnum])
+		ckt.cc0inlist[netnum] = make([]int, ckt.fanin[netnum])
 		for j := 0; j < ckt.fanin[netnum]; j++ {
-			ckt.inlist[netnum][j] = split[split_pos]
+			ckt.cc0inlist[netnum][j] = split[split_pos]
 			split_pos++
 		}
 
-		split_pos += ckt.fanin[netnum]
+		ckt.cc1inlist[netnum] = make([]int, ckt.fanin[netnum])
+		for j := 0; j < ckt.fanin[netnum]; j++ {
+			ckt.cc1inlist[netnum][j] = split[split_pos]
+			split_pos++
+		}
 
 		//build fanout slice
 		ckt.fanout[netnum] = split[split_pos]

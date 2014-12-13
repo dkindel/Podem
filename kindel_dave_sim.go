@@ -1,12 +1,39 @@
 package main
 
+func imply() {
+	for i := 1; i < ckt.numlevels; i++ {
+		for j := 0; j < len(ckt.gateByLevel[i]); j++ {
+			gatenum := ckt.gateByLevel[i][j]
+			faninslice := ckt.cc0inlist[gatenum]
+
+			faninVal := make([]int, len(faninslice))
+			for k, gate := range faninslice {
+				faninVal[k] = ckt.value1[gate]
+			}
+			val1 := simGate(ckt.gatetype1[gatenum], faninVal)
+			val2 := simGate(ckt.gatetype2[gatenum], faninVal)
+			if val1 == val2 {
+				ckt.value1[gatenum] = val1
+			} else if val1 == 2 || val2 == 2 {
+				ckt.value1[gatenum] = 2
+			} else {
+				if val1 == 1 {
+					ckt.value1[gatenum] = 3
+				} else {
+					ckt.value1[gatenum] = 4
+				}
+			}
+		}
+	}
+}
+
 func goodsim() {
 	//first level is already filled in
 	//loop through the rest
 	for i := 1; i < ckt.numlevels; i++ {
 		for j := 0; j < len(ckt.gateByLevel[i]); j++ {
 			gatenum := ckt.gateByLevel[i][j]
-			faninslice := ckt.inlist[gatenum]
+			faninslice := ckt.cc0inlist[gatenum]
 
 			faninVal := make([]int, len(faninslice))
 			for k, gate := range faninslice {

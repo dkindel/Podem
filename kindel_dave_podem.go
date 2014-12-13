@@ -5,6 +5,14 @@ import (
 	"sort"
 )
 
+type Objective struct {
+	gatenum, val int
+}
+type PI struct {
+	inputnum, val int
+	alternateUsed bool
+}
+
 type ByInputX [][]int
 
 //sort functions to sort by x
@@ -89,7 +97,7 @@ func makeInputList(gateNum, outVal int) [][]int {
 		attempt := make([]int, ckt.fanin[gateNum])
 		index := 0
 		for j := ckt.fanin[gateNum] - 1; j >= 0; j-- {
-			currFaninGate := ckt.inlist[gateNum][j]
+			currFaninGate := ckt.cc0inlist[gateNum][j]
 			if ckt.value1[currFaninGate] == 2 { //only change if it's x
 				div := intpow(numVals, index)
 				attempt[j] = (i / div) % numVals
@@ -176,46 +184,97 @@ func runPodemAllFaults() {
 }
 
 //runs podem for a single fault
-func runPodem(f Fault) {
+func runPodem(f Fault) bool {
 	//find what inputs will sensitize the fault
 	inputlist := sensitizedFaultList(f)
-	inputstack := makeStack(inputlist)
 
-podemStart: //marks the start of podem.  Used to break out of a loop and
-	//start with the next value if a justification is impossible
-	for inputstack.Len() > 0 {
-		input := inputstack.Pop().([]int)
-		//fmt.Println("justifying for ", input)
+	varDseen := false
+	varDBseen := false
+
+	fmt.Println(inputlist)
+
+	//This is essentially running through the implication stack
+	//The test can still be tested using a different input.
+podemStart: //Label here so we can continue if failed
+	for _, input := range inputlist {
+		//select the first group of inputs that sensitize the fault
 		setAllToX()
-		clearAllStacks()
-		//set the inputs to the gate and simulate!
-		for i, val := range input {
-			ckt.value1[ckt.inlist[f.gatenum][i]] = val
+		if simGate(ckt.gatetype1[f.gatenum], input) == 1 {
+			if varDseen { //no need to run podem for the same variable
+				continue
+			}
+			varDseen = true
+		} else {
+			if varDBseen {
+				continue
+			}
+			varDBseen = true
 		}
 
-		//we know that the value has to be either 0 or 1 here
-		//anything else won't have been put into the list
-		if simGate(ckt.gatetype1[f.gatenum], input) == 1 {
-			ckt.value1[f.gatenum] = 3
-		} else {
-			ckt.value1[f.gatenum] = 4
-		}
-		//fmt.Println(ckt.inlist[f.gatenum])
-		for _, inputNum := range ckt.inlist[f.gatenum] {
-			//fmt.Println("running justify for ", inputNum, " under ", f.gatenum)
-			if !justify(inputNum) {
-				fmt.Println("podem failure")
-				continue podemStart //failed.  Need to continue
+		var stack Stack
+		fmt.Println("running xpath with ", f.gatenum)
+		for {
+			for xpathCheck(f.gatenum) {
+				fmt.Println("running getObjective with inputs ", input, " for ", f.gatenum)
+				objective := getObjective(f.gatenum, input)
+				fmt.Println("getObjective returned with ", objective)
+				if objective.gatenum == -1 {
+					panic("uh oh")
+				}
+				pi := backtrace(objective)
+				fmt.Println("backtrace from ", objective, " provided ", pi)
+				stack.Push(pi)
+				ckt.value1[pi.inputnum] = pi.val
+				if implyAndTest() {
+					return true
+				}
+			}
+			for {
+				//if we've run out of backtracking options
+				if stack.Len() == 0 {
+					fmt.Println("input ", input, " has failed.  Moving to next input.")
+					continue podemStart
+				}
+				//otherwise, we can backtrack!
+				lastPI := stack.Pop().(PI)
+				if !lastPI.alternateUsed {
+					lastPI.alternateUsed = true
+					if lastPI.val == 0 {
+						lastPI.val = 1
+					} else {
+						lastPI.val = 0
+					}
+					stack.Push(lastPI)
+					ckt.value1[lastPI.inputnum] = lastPI.val
+					fmt.Println("Backtracking. Now using pi ", lastPI.inputnum, " with value ", lastPI.val)
+					if implyAndTest() {
+						return true
+					}
+					break //perform xtest again and continue
+				}
 			}
 		}
-		if !prop(f.gatenum) {
-			continue
-		}
-		fmt.Println("success")
 	}
+	/*
+		for i := 1; i <= ckt.numgates; i++ {
+			fmt.Println("gate ", i, " has logic val ", ckt.value1[i])
+		}*/
+	fmt.Println("All possible inputs have failed.  No test is possible.")
+	return false
+}
+
+func implyAndTest() bool {
+	imply()
 	for i := 1; i <= ckt.numgates; i++ {
 		fmt.Println("gate ", i, " has logic val ", ckt.value1[i])
 	}
+	for _, po := range ckt.outputs {
+		if ckt.value1[po] == 3 || ckt.value1[po] == 4 {
+			fmt.Println("SUCCESS! D has been propogated")
+			return true
+		}
+	}
+	return false
 }
 
 //sets all the values in the entire circuit to x
@@ -223,15 +282,6 @@ func setAllToX() {
 	for i := 1; i <= ckt.numgates; i++ {
 		ckt.value1[i] = 2
 		ckt.value2[i] = 2
-	}
-}
-
-//clears all of the stacks in the circuit
-func clearAllStacks() {
-	for i := 1; i <= ckt.numgates; i++ {
-		for ckt.stacks[i].Len() > 0 {
-			ckt.stacks[i].Pop()
-		}
 	}
 }
 
@@ -244,70 +294,293 @@ func runSensList() {
 	}
 }
 
-//justify function for podem! This function completes
-//the first "half" of the algorithm
-func justify(gatenum int) bool {
-	//fmt.Println("running justify on ", gatenum)
-	//check if it's an input or if the value of the gate you're
-	//trying to justfiy is an X.  If it is, it's already justified
-	if ckt.gatetype1[gatenum] == T_input || ckt.value1[gatenum] == 2 {
-		return true
+func getObjective(gatenum int, faultGateInputs []int) Objective {
+	var objective Objective
+	for i, inputval := range faultGateInputs {
+		//get the input gate i of the faulty gate, gatenum
+		inputgate := ckt.cc0inlist[gatenum][i]
+		//if the input i of the fault gate, gatenum, is x
+		if ckt.value1[inputgate] == 2 {
+			//set the objective and val to the
+			objective.gatenum = inputgate
+			objective.val = inputval
+			return objective
+		}
 	}
-	//get possible values
-	filledInputVals := makeInputList(gatenum, ckt.value1[gatenum])
-	for _, item := range filledInputVals {
-		ckt.stacks[gatenum].Push(item)
+	dgate, val := xGateFromDFrontier(gatenum, ckt.value1[gatenum])
+	fmt.Println("xGateFromDFrontier returned ", dgate, val)
+	if dgate == -1 {
+		objective.gatenum = -1
+		objective.val = -1
+		return objective
 	}
-	justified := false
+	/*if dgate == gatenum {
+		objective.gatenum = gatenum
+		if val == 1 {
+			objective.val = 0
+		}
+		if val == 0 {
+			objective.val = 1
+		}
+		return objective
+	}
+	c := 0
+	controlgate, controlval := controllingInput(dgate)
+	if controlgate != -1 {
+		if controlval != 2 {
+			c = controlval
+		}
+		dgate = controlgate
+	}
+	objective.gatenum = dgate
+	if c == 0 {
+		objective.val = 1
+	} else {
+		objective.val = 0
+	}*/
+	objective.gatenum = dgate
+	objective.val = val
+	return objective
+}
 
-	savedInputState := make([]int, ckt.fanin[gatenum])
-	for i, val := range ckt.inlist[gatenum] {
-		savedInputState[i] = ckt.value1[val]
-	}
-
-	for ckt.stacks[gatenum].Len() > 0 {
-		list := ckt.stacks[gatenum].Pop().([]int)
-		for i, val := range list {
-			if val == 2 { //the value x will already be justified
-				justified = true
-				continue
-			}
-			inputnum := ckt.inlist[gatenum][i]
-			//if the value already in the ckt isn't x,
-			//we need to check if it works for us
-			if ckt.value1[inputnum] != 2 {
-				if ckt.value1[inputnum] == val { //this value works
-					continue
-				} else {
-					justified = false
-					break
+func controllingInput(dgate int) (int, int) {
+	val := simGate(ckt.gatetype2[dgate], ckt.cc0inlist[dgate])
+	switch ckt.gatetype2[dgate] {
+	case T_or:
+		fallthrough
+	case T_nand:
+		if val == 0 {
+			return ckt.cc0inlist[dgate][0], 0
+		} else if val == 1 {
+			numOnes := 0
+			var gate int
+			for _, input := range ckt.cc0inlist[dgate] {
+				if ckt.value1[input] == 1 {
+					numOnes++
+					gate = input
 				}
 			}
-			ckt.value1[inputnum] = val
-			justified = justify(inputnum)
-			if !justified {
-				//one of the inputs couldn't be justified
-				//invalidate every input and start over
-				for i, val := range ckt.inlist[gatenum] {
-					ckt.value1[val] = savedInputState[i]
+			if numOnes == 1 {
+				return gate, 1
+			}
+		} else if val == 2 {
+			numX := 0
+			var gate int
+			for _, input := range ckt.cc0inlist[dgate] {
+				if ckt.value1[input] == 2 {
+					numX++
+					gate = input
 				}
-				break
+			}
+			if numX == 1 {
+				return gate, 2
 			}
 		}
-		if justified {
+	case T_nor:
+		fallthrough
+	case T_and:
+		if val == 1 {
+			return ckt.cc0inlist[dgate][0], 1
+		} else if val == 0 {
+			numZeroes := 0
+			var gate int
+			for _, input := range ckt.cc0inlist[dgate] {
+				if ckt.value1[input] == 0 {
+					numZeroes++
+					gate = input
+				}
+			}
+			if numZeroes == 1 {
+				return gate, 0
+			}
+		} else if val == 2 {
+			numX := 0
+			var gate int
+			for _, input := range ckt.cc0inlist[dgate] {
+				if ckt.value1[input] == 2 {
+					numX++
+					gate = input
+				}
+			}
+			if numX == 1 {
+				return gate, 2
+			}
+		}
+	}
+	return -1, -1 //no controlling gate found
+}
+
+func xGateFromDFrontier(gatenum, val int) (int, int) {
+	for _, output := range ckt.outlist[gatenum] {
+		if (ckt.value1[output] == 3) || (ckt.value1[output] == 4) {
+			return xGateFromDFrontier(output, ckt.value1[output])
+		}
+	}
+	for _, output := range ckt.outlist[gatenum] {
+		if ckt.value1[output] == 2 {
+			gtype := ckt.gatetype2[output]
+			flipVal := (gtype == T_not) || (gtype == T_nand) || (gtype == T_nor)
+			if val == 3 {
+				if flipVal {
+					return output, 4
+				}
+				return output, 3
+			} else {
+				if flipVal {
+					return output, 3
+				}
+				return output, 4
+			}
+		}
+	}
+	return -1, -1
+}
+
+func xpathCheck(faultyGate int) bool {
+	for _, po := range ckt.outputs {
+		if xpathRecur(faultyGate, po) {
 			return true
 		}
 	}
-	return justified
+	if ckt.value1[faultyGate] != 2 {
+		response, _ := xGateFromDFrontier(faultyGate, ckt.value1[faultyGate])
+		if response == -1 {
+			return false
+		}
+	}
+	return true
 }
 
-//Propogate function for podem.  This function
-//completes the second "half" of podem
-func prop(gatenum int) bool {
-	for _, gate := range ckt.outlist[gatenum] {
-		ckt.value1[gate] = 4
-		justify(gate)
+func xpathRecur(faultyGate, gate int) bool {
+	for _, input := range ckt.cc0inlist[gate] {
+		//we're looking at the faulty gate.
+		if input == faultyGate {
+			//if the faulty gate is an x, D can still be progated
+			if ckt.value1[input] == 2 {
+				return true
+			} else { //if it's not an x, we have to backtrack
+				return false
+			}
+		}
+		//looking at a different gate
+		if (ckt.value1[input] == 3) || (ckt.value1[input] == 4) {
+			return true
+		} else if ckt.value1[input] == 2 {
+			return xpathRecur(faultyGate, input)
+		}
 	}
+	return false
+}
 
-	return true
+func backtrace(objective Objective) PI {
+	var pi PI
+	currGate := objective.gatenum
+	currVal := objective.val
+	for ckt.gatetype1[currGate] != T_input {
+		if allInputsNeedSet(currVal, ckt.gatetype2[currGate]) {
+			//follow path of hardest controllability
+			numInputs := ckt.fanin[currGate]
+			if currVal == 1 {
+				for i := numInputs - 1; i >= 0; i-- {
+					input := ckt.cc1inlist[currGate][i]
+					if ckt.value1[input] == 2 {
+						gtype := ckt.gatetype2[currGate]
+						flipVal := (gtype == T_not) || (gtype == T_nand) || (gtype == T_nor)
+						if flipVal {
+							currVal = 0
+						}
+						currGate = input
+						break
+					}
+				}
+			} else {
+				for i := numInputs - 1; i >= 0; i-- {
+					input := ckt.cc0inlist[currGate][i]
+					if ckt.value1[input] == 2 {
+						gtype := ckt.gatetype2[currGate]
+						flipVal := (gtype == T_not) || (gtype == T_nand) || (gtype == T_nor)
+						if flipVal {
+							currVal = 1
+						}
+						currGate = input
+						break
+					}
+				}
+
+			}
+		} else {
+			//follow easiest controllability
+			numInputs := ckt.fanin[currGate]
+			if currVal == 1 {
+				for i := 0; i < numInputs; i++ {
+					input := ckt.cc1inlist[currGate][i]
+					if ckt.value1[input] == 2 {
+						gtype := ckt.gatetype2[currGate]
+						flipVal := (gtype == T_not) || (gtype == T_nand) || (gtype == T_nor)
+						if flipVal {
+							currVal = 0
+						}
+						currGate = input
+						break
+					}
+				}
+			} else {
+				for i := 0; i < numInputs; i++ {
+					input := ckt.cc0inlist[currGate][i]
+					if ckt.value1[input] == 2 {
+						gtype := ckt.gatetype2[currGate]
+						flipVal := (gtype == T_not) || (gtype == T_nand) || (gtype == T_nor)
+						if flipVal {
+							currVal = 1
+						}
+						currGate = input
+						break
+					}
+				}
+			}
+		}
+		fmt.Println("backtracing ", currGate, " with currVal ", currVal)
+	}
+	pi.inputnum = currGate
+	pi.val = currVal
+	pi.alternateUsed = false
+	return pi
+}
+
+func allInputsNeedSet(gateval, gatetype int) bool {
+	if gateval == 0 {
+		switch gatetype {
+		case T_not:
+			fallthrough
+		case T_buf:
+			fallthrough
+		case T_or:
+			fallthrough
+		case T_xor:
+			fallthrough
+		case T_xnor:
+			fallthrough
+		case T_nand:
+			return true
+		default:
+			return false
+		}
+	} else {
+		switch gatetype {
+		case T_not:
+			fallthrough
+		case T_buf:
+			fallthrough
+		case T_nor:
+			fallthrough
+		case T_and:
+			fallthrough
+		case T_xor:
+			fallthrough
+		case T_xnor:
+			return true
+		default:
+			return false
+		}
+	}
 }
