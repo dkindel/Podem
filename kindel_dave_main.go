@@ -11,7 +11,6 @@ var debugOn bool
 
 func main() {
 	//find the file name and check for the debug flag
-	fmt.Println(len(os.Args), "provided")
 	if len(os.Args) < 2 {
 		panic("No argument provided!")
 	} else if len(os.Args) >= 4 {
