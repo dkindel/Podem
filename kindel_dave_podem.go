@@ -41,22 +41,27 @@ func sensitizedFaultList(fault Fault) [][]int {
 }
 
 //loops through all the faults and runs podem
-func runPodemAllFaults() {
+func runPodemAllFaults() (int, int) {
+	successes := 0
+	failures := 0
 	for _, fault := range ckt.faults {
 		fmt.Println("----------------------------------------------------------")
 		fmt.Println("Running PODEM on fault of faulty gate", fault.gatenum, "with gate type", fault.gatetype)
 		ckt.gatetype2[fault.gatenum] = fault.gatetype
 		//fault now injected.  Now we need to run
 		if runPodem(fault) {
+			successes++
 			fmt.Println("The vector that sensitizes faulty gate", fault.gatenum, "with gate type", fault.gatetype, "is:")
 			for i := 0; i < ckt.numin; i++ {
 				fmt.Println(ckt.inputs[i], " = ", ckt.value1[ckt.inputs[i]])
 			}
 		} else {
+			failures++
 			fmt.Println("All possible inputs have failed.  No test is possible for faulty gate", fault.gatenum, "with gate type", fault.gatetype)
 		}
 		ckt.gatetype2[fault.gatenum] = ckt.gatetype1[fault.gatenum]
 	}
+	return successes, failures
 }
 
 //runs podem for a single fault
@@ -187,7 +192,10 @@ func getObjective(gatenum int, faultGateInputs []int) Objective {
 func xGateFromDFrontier(gatenum, val int) (int, int) {
 	for _, output := range ckt.outlist[gatenum] {
 		if (ckt.value1[output] == 3) || (ckt.value1[output] == 4) {
-			return xGateFromDFrontier(output, ckt.value1[output])
+			output, val := xGateFromDFrontier(output, ckt.value1[output])
+			if output != -1 {
+				return output, val
+			}
 		}
 	}
 	for _, output := range ckt.outlist[gatenum] {

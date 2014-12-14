@@ -65,7 +65,7 @@ If you `cd` to the podem directory, there are 2 ways to build the code. One is t
 
 To run the code, run `go run *.go [filename] [-debug]`. This will build and automatically run the code.  The parameters are explained in the next section.
 
-4 example tests have been provided, c1, c2, c3, and c4. c1 is the same as c17 in past projects in this class.  c2 is the same as c17 but with an extra input on gate 8.  c3 is a completely different circuit with a lot of types of gates and many gates in different levels.  c4 is the same circuit as c3 but the fault list runs through all possible variations of gate substitutions.
+5 example tests have been provided, c1, c2, c3, c4, and c5. c1 is the same as c17 in past projects in this class with some minor modifications.  c2 is the same as c17 but with an extra input on gate 8.  c3 is a completely different circuit with a lot of types of gates and many gates in different levels.  c4 is the same circuit as c3 but the fault list runs through all possible variations of gate substitutions. c5 is a large circuit. This one will prove that it works for circuits larger than a few gates.
 
 ####Parameters
 
@@ -81,7 +81,7 @@ The .lev and .flt file descriptions are described later.
 The debug flag is just a string of "-debug" and is case insensitive.  The importance of this flag is that a lot of debug information can be discovered by setting this.  Backtrace information, periodic circuit states, and objectives can be displayed along with come other information.  If you're looking for specifics of how the code runs, this is the flag you want to set.  
 
 ###.lev
-The .lev file is the levelized circuit.  A couple example test files are included along with this source code.  It is the same format as the .lev files used in the previous projects with a minor change, that the final `END` line is removed.
+The .lev file is the levelized circuit.  A couple example test files are included along with this source code.  It is the same format as the .lev files used in the previous projects with 2 minor changes. The final `END` line is removed and each level is now represented in steps of 1 instead of 5.  There was no reason to implement it in steps of 5 before and just made things a little more complicated.
 
 ###.flt
 This is the custom-made fault file.  It is read by first reading the first line.  That is just an integer letting the program know how many faults are described in the .flt file.  Every other line has 2 numbers.  The first number is the gate number with the fault.  The second number is the number of the gate type that has been substituted in. 

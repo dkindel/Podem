@@ -27,7 +27,10 @@ func main() {
 	makecircuit(name)
 
 	loadFaults(name) //load the faults from the file
-	runPodemAllFaults()
+	faultSuccesses, faultFailures := runPodemAllFaults()
+
+	fmt.Println(faultFailures, "faults are undetectable")
+	fmt.Println(faultSuccesses, "faults have been successfully simulated")
 	//makeInputList(8, 1)
 }
 
