@@ -55,6 +55,7 @@ func runPodemAllFaults() {
 		} else {
 			fmt.Println("All possible inputs have failed.  No test is possible for faulty gate", fault.gatenum, "with gate type", fault.gatetype)
 		}
+		ckt.gatetype2[fault.gatenum] = ckt.gatetype1[fault.gatenum]
 	}
 }
 

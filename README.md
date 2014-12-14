@@ -65,7 +65,7 @@ If you `cd` to the podem directory, there are 2 ways to build the code. One is t
 
 To run the code, run `go run *.go [filename] [-debug]`. This will build and automatically run the code.  The parameters are explained in the next section.
 
-3 example tests have been provided, c1, c2, and c3. c1 is the same as c17 in past projects in this class.  c2 is the same as c17 but with an extra input on gate 8.  c3 is a completely different circuit with a lot of types of gates and many gates in different levels.  
+4 example tests have been provided, c1, c2, c3, and c4. c1 is the same as c17 in past projects in this class.  c2 is the same as c17 but with an extra input on gate 8.  c3 is a completely different circuit with a lot of types of gates and many gates in different levels.  c4 is the same circuit as c3 but the fault list runs through all possible variations of gate substitutions.
 
 ####Parameters
 
@@ -115,7 +115,7 @@ The numbering starts as JUNK = 0, T\_input = 1, and so on.
 ###Output
 If the debug flag is set, a lot of information will be output and most will be pretty clear.  But regardless, the last couple lines will either declare a success or a failure of the PODEM algorithm.  If there's a failure, a failure message will display.  If there's a success, a success message will display along with the input the vectors that will cause the fault to be propogated.
 
-For example, an example successful output would be 
+For example, a successful output would be 
 ```
 -------------------------------------------------------
 Running PODEM on fault of faulty gate 8 with gate type 8
